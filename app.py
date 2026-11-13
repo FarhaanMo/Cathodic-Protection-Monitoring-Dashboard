@@ -8,95 +8,139 @@ import plotly.express as px
 from datetime import datetime
 from pathlib import Path
 
-st.set_page_config(page_title='CP Demo', layout='wide', page_icon='🛡️')
+st.set_page_config(
+    page_title='Cathodic Protection Monitoring Dashboard',
+    layout='wide',
+    page_icon='🛡️',
+    initial_sidebar_state='expanded',
+)
 st.markdown(
     '''
     <style>
     html, body, [data-testid="stAppViewContainer"] {
         color: #0b1f33;
         font-size: 15px;
+        background: #f4f6f8;
     }
     .block-container {
-        padding-top: 1.1rem;
-        padding-bottom: 1.5rem;
-        max-width: 1200px;
+        padding-top: 1.25rem;
+        padding-bottom: 2rem;
+        padding-left: 1.5rem;
+        padding-right: 1.5rem;
+        max-width: 1180px;
     }
     h1 {
-        font-size: 1.85rem !important;
+        font-size: 1.7rem !important;
+        font-weight: 700 !important;
         color: #0b1f33 !important;
-        margin-bottom: 0.35rem !important;
+        margin-bottom: 0.25rem !important;
+        letter-spacing: -0.01em;
     }
     h2, h3 {
         color: #0b1f33 !important;
         letter-spacing: 0.01em;
+        font-weight: 650 !important;
     }
     [data-testid="stSidebar"] {
-        background: #f8fafc;
-        border-right: 1px solid #d9e2ec;
+        background: #edf1f5;
+        border-right: 1px solid #cfd8e3;
     }
-    [data-testid="stSidebar"] * {
-        color: #0b1f33 !important;
-        font-size: 0.95rem !important;
-    }
-    [data-testid="stSidebar"] h2 {
-        font-size: 1.2rem !important;
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h2 {
+        font-size: 1.15rem !important;
         font-weight: 700 !important;
+        color: #0b1f33 !important;
+        margin-bottom: 0.35rem !important;
     }
     [data-testid="stSidebar"] label,
-    [data-testid="stSidebar"] p {
-        font-size: 0.92rem !important;
+    [data-testid="stSidebar"] p,
+    [data-testid="stSidebar"] span {
         color: #243b53 !important;
+    }
+    [data-testid="stSidebar"] hr {
+        margin: 0.65rem 0 0.85rem 0;
+        border-color: #cfd8e3;
     }
     [data-testid="stMetric"] {
         background: #ffffff;
-        border: 1px solid #d9e2ec;
-        border-radius: 10px;
-        padding: 14px 16px;
+        border: 1px solid #d0d7e2;
+        border-radius: 8px;
+        padding: 0.9rem 1rem;
+        box-shadow: none;
     }
     [data-testid="stMetricLabel"],
     [data-testid="stMetricLabel"] * {
-        color: #1d4e89 !important;
-        font-size: 0.95rem !important;
+        color: #486581 !important;
+        font-size: 0.82rem !important;
         font-weight: 600 !important;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
     }
     [data-testid="stMetricValue"],
     [data-testid="stMetricValue"] * {
         color: #0b1f33 !important;
-        font-size: 1.7rem !important;
-        font-weight: 650 !important;
+        font-size: 1.55rem !important;
+        font-weight: 700 !important;
     }
     [data-testid="stCaption"] {
-        color: #334e68 !important;
+        color: #486581 !important;
         font-size: 0.86rem !important;
         line-height: 1.45 !important;
     }
     div[data-testid="stDataFrame"] {
-        border: 1px solid #d9e2ec;
+        border: 1px solid #d0d7e2;
         border-radius: 8px;
+        overflow: hidden;
     }
     .cp-source-box {
         background: #ffffff;
-        border: 1px solid #d9e2ec;
-        border-radius: 8px;
-        padding: 0.75rem 1rem;
-        margin: 0.4rem 0 0.9rem 0;
+        border: 1px solid #d0d7e2;
+        border-left: 4px solid #1d4e89;
+        border-radius: 6px;
+        padding: 0.85rem 1.05rem;
+        margin: 0.5rem 0 1rem 0;
         color: #0b1f33;
         font-size: 0.92rem;
-        line-height: 1.45;
+        line-height: 1.5;
     }
     .cp-source-box strong { color: #1d4e89; }
     .cp-sim-banner {
-        background: #fff4e5;
-        border: 2px solid #d9480f;
-        border-radius: 8px;
-        padding: 0.85rem 1rem;
-        margin: 0.35rem 0 0.9rem 0;
+        background: #fff8f1;
+        border: 1px solid #e8590c;
+        border-left: 4px solid #e8590c;
+        border-radius: 6px;
+        padding: 0.85rem 1.05rem;
+        margin: 0.35rem 0 1rem 0;
         color: #0b1f33;
-        font-size: 1rem;
+        font-size: 0.95rem;
         font-weight: 600;
-        line-height: 1.4;
+        line-height: 1.45;
+    }
+    .cp-section-label {
+        color: #486581;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        margin: 0.15rem 0 0.55rem 0;
+    }
+    .cp-note-box {
+        background: #f8fafc;
+        border: 1px solid #d0d7e2;
+        border-radius: 6px;
+        padding: 0.7rem 0.9rem;
+        margin: 0.35rem 0 0.85rem 0;
+        color: #334e68;
+        font-size: 0.88rem;
+        line-height: 1.45;
     }
     .stDeployButton { display: none; }
+    @media (max-width: 768px) {
+        .block-container {
+            padding-left: 0.85rem;
+            padding-right: 0.85rem;
+        }
+        h1 { font-size: 1.35rem !important; }
+    }
     </style>
     ''',
     unsafe_allow_html=True,
@@ -138,16 +182,24 @@ REVIEW_STATUSES = (WARNING, CRITICAL, DATA_QUALITY, UNKNOWN)
 OPEN_STATUSES = ('Open', 'Acknowledged')
 NAVY = '#0b1f33'
 BLUE = '#1d4e89'
+SLATE = '#486581'
 STATUS_FILL = {
-    NORMAL: '#d8f3dc',
-    WARNING: '#fff3cd',
-    CRITICAL: '#f8d7da',
-    DATA_QUALITY: '#e9ecef',
-    UNKNOWN: '#e9ecef',
-    'Possible sudden drop': '#ffe8d6',
-    'No sudden drop': '#d8f3dc',
-    'Gap too large to confirm': '#fff3cd',
-    'Insufficient data': '#e9ecef',
+    NORMAL: '#d9eee1',
+    WARNING: '#fff1c9',
+    CRITICAL: '#f7d6da',
+    DATA_QUALITY: '#e6ebf0',
+    UNKNOWN: '#e6ebf0',
+    'Possible sudden drop': '#ffe4cc',
+    'No sudden drop': '#d9eee1',
+    'Gap too large to confirm': '#fff1c9',
+    'Insufficient data': '#e6ebf0',
+}
+STATUS_CHART = {
+    NORMAL: '#2f6f4e',
+    WARNING: '#b08900',
+    CRITICAL: '#a33b46',
+    DATA_QUALITY: '#627d98',
+    UNKNOWN: '#627d98',
 }
 
 
@@ -281,7 +333,8 @@ def describe_read_error(exc: Exception) -> str:
     text = str(exc).lower()
     if name in {'BadZipFile', 'BadZipfile'} or 'excel file format' in text or 'not a zip' in text:
         return 'history.xlsx could not be read. It may still be saving.'
-    return f'history.xlsx could not be read ({name}: {exc}).'
+    # Avoid echoing exception text that might include local paths or workbook internals.
+    return f'history.xlsx could not be read ({name}).'
 
 
 def format_timestamp(value) -> str:
@@ -650,15 +703,43 @@ def style_chart(fig, height=420):
         template='plotly_white',
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='#ffffff',
-        font={'color': NAVY, 'size': 15},
-        title={'font': {'size': 16, 'color': NAVY}},
-        margin={'l': 16, 'r': 16, 't': 48, 'b': 16},
+        font={'color': NAVY, 'size': 13, 'family': 'Segoe UI, Helvetica, Arial, sans-serif'},
+        title={'font': {'size': 15, 'color': NAVY}, 'x': 0, 'xanchor': 'left'},
+        margin={'l': 48, 'r': 24, 't': 52, 'b': 40},
         height=height,
-        legend={'font': {'size': 13}},
+        legend={
+            'font': {'size': 12},
+            'orientation': 'h',
+            'yanchor': 'bottom',
+            'y': 1.02,
+            'xanchor': 'left',
+            'x': 0,
+        },
+        hovermode='x unified',
     )
-    fig.update_xaxes(showgrid=False, color=NAVY, title_font={'size': 14}, tickfont={'size': 13})
-    fig.update_yaxes(gridcolor='#e2e8f0', color=NAVY, title_font={'size': 14}, tickfont={'size': 13})
+    fig.update_xaxes(
+        showgrid=False,
+        color=SLATE,
+        title_font={'size': 13, 'color': SLATE},
+        tickfont={'size': 12},
+        zeroline=False,
+    )
+    fig.update_yaxes(
+        gridcolor='#e6ebf0',
+        color=SLATE,
+        title_font={'size': 13, 'color': SLATE},
+        tickfont={'size': 12},
+        zeroline=False,
+    )
     return fig
+
+
+def section_label(text: str) -> None:
+    st.markdown(f'<div class="cp-section-label">{text}</div>', unsafe_allow_html=True)
+
+
+def note_box(text: str) -> None:
+    st.markdown(f'<div class="cp-note-box">{text}</div>', unsafe_allow_html=True)
 
 
 def style_status_frame(frame: pd.DataFrame, column: str = 'Status'):
@@ -681,6 +762,8 @@ def show_table(frame, status_column: str | None = None, height=None):
         config['Status'] = st.column_config.TextColumn('Status', width='medium')
     if 'Result' in frame.columns:
         config['Result'] = st.column_config.TextColumn('Result', width='medium')
+    if 'Station' in frame.columns:
+        config['Station'] = st.column_config.TextColumn('Station', width='large')
     if 'Explanation' in frame.columns:
         config['Explanation'] = st.column_config.TextColumn('Explanation', width='large')
     if 'Note' in frame.columns:
@@ -695,6 +778,15 @@ def show_table(frame, status_column: str | None = None, height=None):
     if height is not None:
         kwargs['height'] = height
     st.dataframe(view, **kwargs)
+
+
+def status_summary_counts(summary: pd.DataFrame) -> None:
+    """Compact status counts for Alerts — presentation only."""
+    order = [NORMAL, WARNING, CRITICAL, DATA_QUALITY, UNKNOWN]
+    cols = st.columns(len(order))
+    for col, status in zip(cols, order):
+        count = int((summary['Status'] == status).sum())
+        col.metric(status, count)
 
 
 def overview_table(summary: pd.DataFrame) -> pd.DataFrame:
@@ -712,20 +804,29 @@ def overview_table(summary: pd.DataFrame) -> pd.DataFrame:
 def page_overview(summary: pd.DataFrame, df: pd.DataFrame, latest_valid, newest, simulated: bool):
     valid_count = int((df['voltage'].notna() | df['current'].notna()).sum())
     review_count = int(summary['Status'].isin(REVIEW_STATUSES).sum())
-    latest_date = format_timestamp(latest_valid).split(' ')[0]
+    latest_measurement = format_timestamp(latest_valid)
+    section_label('Key indicators')
     a, b, c, d = st.columns(4)
-    a.metric('Stations', len(STATIONS))
-    b.metric('Requiring review', review_count)
-    c.metric('Latest valid date', latest_date)
-    d.metric('Valid readings', valid_count)
+    a.metric('Total Stations', len(STATIONS))
+    b.metric('Requiring Review', review_count)
+    c.metric('Latest Valid Measurement', latest_measurement)
+    d.metric('Valid Readings', f'{valid_count:,}')
 
+    section_label('Stations')
     st.subheader('Station snapshot')
     show_table(overview_table(summary), status_column='Status')
-    st.caption('Normal means the latest current is not below the Warning level. It is not verified pipeline protection.')
+    note_box(
+        'Status uses demonstration output rules on the latest current versus each station median. '
+        'Normal is not verified pipeline protection.'
+    )
 
-    fresh_col, chart_col = st.columns((1, 1.05))
+    fresh_col, chart_col = st.columns((1, 1.05), gap='large')
     with fresh_col:
         st.subheader('Reading time and freshness')
+        st.caption(
+            'Workbook measurement times versus the newest hour stored in the file. '
+            + ('Simulated times.' if simulated else 'Historical workbook times — not a live field clock.')
+        )
         show_table(reading_freshness(summary, newest))
         with st.expander('Help: reading freshness'):
             st.write(
@@ -736,35 +837,93 @@ def page_overview(summary: pd.DataFrame, df: pd.DataFrame, latest_valid, newest,
             )
     with chart_col:
         st.subheader('Latest current by station')
-        chart = summary.dropna(subset=['Current (A)'])
-        fig = px.bar(chart, y='Station', x='Current (A)', orientation='h', title='Latest current (A)')
-        fig.update_traces(marker_color=BLUE, texttemplate='%{x:.2f}', textposition='outside')
-        style_chart(fig, height=320)
-        fig.update_yaxes(categoryorder='array', categoryarray=list(chart['Station'])[::-1])
-        st.plotly_chart(fig, config={'displayModeBar': False})
+        st.caption('Latest measured current (A). Colour reflects demonstration status only.')
+        chart = summary.dropna(subset=['Current (A)']).copy()
+        if chart.empty:
+            st.info('No valid current readings are available to chart.')
+        else:
+            fig = px.bar(
+                chart,
+                y='Station',
+                x='Current (A)',
+                color='Status',
+                orientation='h',
+                title='Latest current by station (A)',
+                color_discrete_map=STATUS_CHART,
+                category_orders={'Status': [NORMAL, WARNING, CRITICAL, DATA_QUALITY, UNKNOWN]},
+                hover_data={
+                    'Station': True,
+                    'Current (A)': ':.2f',
+                    'Status': True,
+                    'System': True,
+                    'Voltage (V)': ':.2f',
+                },
+            )
+            fig.update_traces(texttemplate='%{x:.2f} A', textposition='outside', cliponaxis=False)
+            style_chart(fig, height=340)
+            fig.update_layout(xaxis_title='Current (A)', yaxis_title='')
+            fig.update_yaxes(categoryorder='array', categoryarray=list(chart['Station'])[::-1])
+            st.plotly_chart(fig, config={'displayModeBar': False}, width='stretch')
+
+
+def _trend_line(station: pd.DataFrame, y_col: str, title: str, y_title: str, unit: str):
+    """Line chart that breaks on missing values and keeps zeros visible."""
+    plot = station[['timestamp', y_col]].copy()
+    fig = px.line(
+        plot,
+        x='timestamp',
+        y=y_col,
+        title=title,
+        markers=True,
+    )
+    fig.update_traces(
+        line_color=BLUE,
+        connectgaps=False,
+        mode='lines+markers',
+        marker={'size': 5, 'color': BLUE},
+        hovertemplate=(
+            f'Time: %{{x|%Y-%m-%d %H:%M}}<br>{y_title}: %{{y:.2f}} {unit}'
+            '<extra></extra>'
+        ),
+    )
+    style_chart(fig, height=360)
+    fig.update_layout(xaxis_title='Timestamp', yaxis_title=y_title, hovermode='closest')
+    return fig
 
 
 def page_trends(df: pd.DataFrame, simulated: bool):
+    section_label('Station history')
     name = st.selectbox('Station', [station[0] for station in STATIONS], key='trend_station')
     station = df[df['station'] == name]
     if simulated:
         st.info('Charts below use simulated demonstration data, not history.xlsx.')
-    voltage, current = st.columns(2)
+    else:
+        st.caption('Historical workbook readings for the selected station. Not live SCADA telemetry.')
+    voltage, current = st.columns(2, gap='large')
     with voltage:
-        fig = px.line(station, x='timestamp', y='voltage', title='Voltage (V)')
-        fig.update_traces(line_color=BLUE, connectgaps=False)
-        st.plotly_chart(style_chart(fig, height=360), config={'displayModeBar': False})
+        st.plotly_chart(
+            _trend_line(station, 'voltage', 'Voltage over time', 'Voltage (V)', 'V'),
+            config={'displayModeBar': False},
+            width='stretch',
+        )
     with current:
-        fig = px.line(station, x='timestamp', y='current', title='Current (A)')
-        fig.update_traces(line_color=BLUE, connectgaps=False)
-        st.plotly_chart(style_chart(fig, height=360), config={'displayModeBar': False})
-    st.caption(
-        f'Missing voltage samples: {int(station.voltage.isna().sum())}'
-        f' | Missing current samples: {int(station.current.isna().sum())}'
+        st.plotly_chart(
+            _trend_line(station, 'current', 'Current over time', 'Current (A)', 'A'),
+            config={'displayModeBar': False},
+            width='stretch',
+        )
+    missing_v = int(station.voltage.isna().sum())
+    missing_c = int(station.current.isna().sum())
+    zero_v = int(((station.voltage == 0) & station.voltage.notna()).sum())
+    zero_c = int(((station.current == 0) & station.current.notna()).sum())
+    note_box(
+        f'Missing values create gaps in the line (not drawn as zero). '
+        f'Missing voltage: {missing_v} · Missing current: {missing_c} · '
+        f'Recorded zero voltage: {zero_v} · Recorded zero current: {zero_c}.'
     )
     label, detail = output_trend(station)
     st.subheader('Output change over time')
-    trend_col, note_col = st.columns((0.35, 0.65))
+    trend_col, note_col = st.columns((0.35, 0.65), gap='large')
     with trend_col:
         st.metric('Output trend', label)
     with note_col:
@@ -792,9 +951,20 @@ def show_current_projection(station: pd.DataFrame):
         'Illustrative trend (A)': intercept + slope * future_days,
     })
     fig = px.line(projected, x='Date', y='Illustrative trend (A)', title='Daily average current, extended 7 days')
-    fig.update_traces(line_color=BLUE, name='Illustrative trend')
-    fig.add_scatter(x=daily.index, y=daily.values, mode='markers', name='Daily average (A)', marker_color=NAVY)
-    st.plotly_chart(style_chart(fig, height=360), config={'displayModeBar': False})
+    fig.update_traces(
+        line_color=BLUE,
+        name='Illustrative trend',
+        hovertemplate='Date: %{x|%Y-%m-%d}<br>Trend: %{y:.2f} A<extra></extra>',
+    )
+    fig.add_scatter(
+        x=daily.index,
+        y=daily.values,
+        mode='markers',
+        name='Daily average (A)',
+        marker_color=NAVY,
+        hovertemplate='Date: %{x|%Y-%m-%d}<br>Daily average: %{y:.2f} A<extra></extra>',
+    )
+    st.plotly_chart(style_chart(fig, height=360), config={'displayModeBar': False}, width='stretch')
     st.metric('Illustrative slope', f'{slope:.3f} A/day')
     st.caption(
         'This line only extends the daily average current by 7 days. '
@@ -817,16 +987,24 @@ def output_rows(summary: pd.DataFrame) -> pd.DataFrame:
 
 
 def page_alerts(summary: pd.DataFrame, df: pd.DataFrame, warning_pct: int, critical_pct: int, drop_pct: int, simulated: bool):
+    section_label('Output classification')
     st.subheader('Current output classification')
+    note_box(
+        'These Warning / Critical / Normal / Data quality labels are demonstration rules based on rectifier '
+        'and solar output tags. They are not proof of pipeline protection and not a confirmed equipment-fault diagnosis.'
+    )
     st.caption(
-        f'Median-based classes: Warning below {warning_pct}%, Critical below {critical_pct}% (checked first). '
-        + ('Source: simulated data.' if simulated else 'Source: history.xlsx.')
+        f'Median-based classes: Warning below {warning_pct}% of station median · '
+        f'Critical below {critical_pct}% (checked first). '
+        + ('Source: simulated scenario data.' if simulated else 'Source: historical history.xlsx readings.')
     )
     with st.expander('Help: median-based Warning and Critical'):
         st.write(
             'Uses each station\'s latest valid current only. '
             'These are demo output classes, not validated CP compliance or corrosion risk.'
         )
+    status_summary_counts(summary)
+    st.markdown('##### Stations requiring attention')
     alarms = summary[summary['Status'].isin([CRITICAL, WARNING])]
     if alarms.empty:
         st.info('No Warning or Critical output. No station\'s latest current is below the Warning level.')
@@ -835,13 +1013,14 @@ def page_alerts(summary: pd.DataFrame, df: pd.DataFrame, warning_pct: int, criti
         st.caption(
             'Cause unknown. Unverified possibilities: equipment output, measurement error, or communications.'
         )
-    st.markdown('**Latest reading check**')
+    st.markdown('##### Latest reading check — all stations')
     show_table(output_rows(summary), status_column='Status')
 
+    section_label('Sudden drop')
     st.subheader('Sudden output drop check')
     st.caption(
-        f'Previous-reading check: possible sudden drop is a fall of {drop_pct}% or more. '
-        'Separate from the median-based classes above.'
+        f'Previous-reading check: a possible sudden drop is a fall of {drop_pct}% or more '
+        'from the immediately previous valid current. Separate from the median-based classes above.'
     )
     with st.expander('Help: sudden-drop method'):
         st.write(
@@ -851,22 +1030,26 @@ def page_alerts(summary: pd.DataFrame, df: pd.DataFrame, warning_pct: int, criti
         )
     drops = sudden_drop_table(df, drop_pct)
     flagged = drops[drops['Result'] == 'Possible sudden drop']
+    st.markdown('##### Flagged sudden-drop results')
     if flagged.empty:
         st.info('No possible sudden drop at the current threshold.')
     else:
         show_table(flagged, status_column='Result')
         st.caption('Possible output anomaly, not confirmed equipment failure.')
-    st.markdown('**Previous-to-latest comparison**')
+    st.markdown('##### Previous-to-latest comparison — all stations')
     show_table(drops, status_column='Result')
 
+    section_label('Data quality')
     st.subheader('Historical data-quality observation')
     st.caption(
-        'Missing hours are Data quality / Unknown concerns, not automatic communication failure or low output.'
+        'Missing hours are Data quality / Unknown concerns, not automatic communication failure or low output. '
+        'A missing sample is different from a recorded zero measurement.'
     )
-    gaps = summary[['Station', 'Missing voltage', 'Missing current', 'Missing hours']].rename(columns={
+    gaps = summary[['Station', 'Missing voltage', 'Missing current', 'Missing hours', 'Hours']].rename(columns={
         'Missing voltage': 'Missing voltage samples',
         'Missing current': 'Missing current samples',
         'Missing hours': 'Hours with a gap',
+        'Hours': 'Total hours in view',
     })
     show_table(gaps)
 
@@ -991,7 +1174,12 @@ def page_events(summary: pd.DataFrame, demo_mode: bool):
     store_path = None if session_events else events_file_for(demo_mode)
     session_key = session_store_key(demo_mode) if session_events else None
     store_label = 'this browser session only' if session_events else store_path.name
+    section_label('Operator-created records')
     st.subheader('Operator inspection events')
+    note_box(
+        'This section stores operator-created demonstration notes only. '
+        'It is separate from the generated recommendations above. No work order is created automatically.'
+    )
     if st.session_state.get('event_message'):
         st.success(st.session_state.pop('event_message'))
     if session_events:
@@ -1010,9 +1198,9 @@ def page_events(summary: pd.DataFrame, demo_mode: bool):
             'Separate from the generated suggestions above. history.xlsx is unchanged.'
         )
     choices = event_choices(summary)
-    form_col, list_col = st.columns((1, 1.15))
+    form_col, list_col = st.columns((1, 1.15), gap='large')
     with form_col:
-        st.markdown('**Create event**')
+        st.markdown('##### Create event')
         if not choices:
             st.info('No flagged station is available for a new event.')
         else:
@@ -1021,7 +1209,7 @@ def page_events(summary: pd.DataFrame, demo_mode: bool):
                 picked = st.selectbox('Flagged station', labels)
                 operator = st.text_input('Operator name')
                 note = st.text_input('Note')
-                submitted = st.form_submit_button('Create event')
+                submitted = st.form_submit_button('Create event', use_container_width=True)
             if submitted:
                 station, level = choices[labels.index(picked)]
                 ok, message = create_event(
@@ -1036,7 +1224,7 @@ def page_events(summary: pd.DataFrame, demo_mode: bool):
     store = load_store(store_path, session_key=session_key)
     events = store['events']
     with list_col:
-        st.markdown('**Event status**')
+        st.markdown('##### Event status')
         if not events:
             st.info('No operator events yet.')
         else:
@@ -1051,38 +1239,44 @@ def page_events(summary: pd.DataFrame, demo_mode: bool):
                 'Updated': event['updated_at'],
                 'Store': store_label,
             } for event in events])
-            show_table(shown)
+            show_table(shown, status_column='Status')
 
     if events:
         open_events = [event for event in events if event['status'] != 'Resolved']
         if open_events:
-            st.markdown('**Update open events**')
+            st.markdown('##### Update open events')
+            st.caption('Acknowledge or resolve an open operator event. Resolve requires a corrective-action note.')
         for event in open_events:
-            st.markdown(f"**{event['station']}** · {event['id']} · {event['status']}")
-            with st.form(f"update_{event['id']}"):
-                operator = st.text_input('Operator name')
-                note = st.text_input('Corrective-action note')
-                acknowledge, resolve = st.columns(2)
-                ack = acknowledge.form_submit_button('Acknowledge') if event['status'] == 'Open' else False
-                done = resolve.form_submit_button('Resolve')
-            if ack:
-                ok, message = update_event(
-                    event['id'], 'Acknowledged', operator, note, path=store_path, session_key=session_key
+            with st.container(border=True):
+                st.markdown(
+                    f"**{event['station']}** · `{event['id']}` · **{event['status']}** · {event['level']}"
                 )
-                if ok:
-                    st.session_state['event_message'] = message
-                    st.rerun()
-                st.warning(message)
-            if done:
-                ok, message = update_event(
-                    event['id'], 'Resolved', operator, note, path=store_path, session_key=session_key
-                )
-                if ok:
-                    st.session_state['event_message'] = message
-                    st.rerun()
-                st.warning(message)
+                with st.form(f"update_{event['id']}"):
+                    operator = st.text_input('Operator name')
+                    note = st.text_input('Corrective-action note')
+                    acknowledge, resolve = st.columns(2)
+                    ack = acknowledge.form_submit_button(
+                        'Acknowledge', use_container_width=True
+                    ) if event['status'] == 'Open' else False
+                    done = resolve.form_submit_button('Resolve', use_container_width=True)
+                if ack:
+                    ok, message = update_event(
+                        event['id'], 'Acknowledged', operator, note, path=store_path, session_key=session_key
+                    )
+                    if ok:
+                        st.session_state['event_message'] = message
+                        st.rerun()
+                    st.warning(message)
+                if done:
+                    ok, message = update_event(
+                        event['id'], 'Resolved', operator, note, path=store_path, session_key=session_key
+                    )
+                    if ok:
+                        st.session_state['event_message'] = message
+                        st.rerun()
+                    st.warning(message)
 
-    with st.expander('Audit history'):
+    with st.expander('Audit history', expanded=False):
         if session_events:
             st.caption(
                 'Temporary demonstration audit trail for this browser session only. '
@@ -1110,10 +1304,15 @@ def page_events(summary: pd.DataFrame, demo_mode: bool):
 
 
 def page_maintenance(summary: pd.DataFrame, demo_mode: bool):
-    inspect_col, quality_col = st.columns(2)
+    section_label('Generated recommendations')
+    note_box(
+        'The tables below are generated suggestions only. They are not operator events and do not create work orders. '
+        'Use Operator inspection events further down to record Create / Acknowledge / Resolve actions.'
+    )
+    inspect_col, quality_col = st.columns(2, gap='large')
     with inspect_col:
         st.subheader('Recommended physical inspection')
-        st.caption('Generated suggestion only. Not an operator event. No work order is created.')
+        st.caption('Generated suggestion only · Warning / Critical stations')
         inspections = []
         for _, station in summary.iterrows():
             if station['Status'] in (CRITICAL, WARNING):
@@ -1129,8 +1328,8 @@ def page_maintenance(summary: pd.DataFrame, demo_mode: bool):
             st.info('No physical inspection is suggested.')
 
     with quality_col:
-        st.subheader('Data Quality Follow-up')
-        st.caption('Data quality / Unknown only. Not automatic communication failure. No work order.')
+        st.subheader('Data quality follow-up')
+        st.caption('Generated suggestion only · Data quality / Unknown / missing hours')
         follow_up = []
         for _, station in summary.iterrows():
             if station['Status'] == DATA_QUALITY:
@@ -1158,6 +1357,7 @@ def page_maintenance(summary: pd.DataFrame, demo_mode: bool):
             show_table(pd.DataFrame(follow_up))
         else:
             st.info('No data-quality follow-up is suggested.')
+    st.divider()
     page_events(summary, demo_mode)
 
 
@@ -1166,10 +1366,16 @@ def render_dashboard():
     session_events = use_session_event_store()
     excel_present = workbook_available()
     with st.sidebar:
-        st.header('CP Demo')
-        refresh_now = st.button('Refresh Now', key='refresh_now', use_container_width=True)
+        st.header('CP Monitoring')
+        st.caption('Cathodic protection demonstration dashboard')
+        st.divider()
+
+        section_label('Navigation')
+        refresh_now = st.button('Refresh now', key='refresh_now', use_container_width=True)
         page = st.radio('Page', PAGES, key='page')
-        st.markdown('**Thresholds**')
+
+        st.divider()
+        section_label('Demonstration thresholds')
         warning_pct = st.slider(
             'Warning below (% of station median)',
             50,
@@ -1195,7 +1401,7 @@ def render_dashboard():
             key='drop_pct',
         )
         warning_pct, critical_pct, adjusted = ordered_thresholds(warning_pct, critical_pct)
-        st.caption('Illustrative demo assumptions only.')
+        st.caption('Illustrative demo assumptions only — not approved operating limits.')
         if adjusted:
             st.caption(f'Critical must stay below Warning. Using Critical {critical_pct}%.')
         with st.expander('Help: threshold meaning'):
@@ -1204,9 +1410,11 @@ def render_dashboard():
                 'Sudden drop compares the latest reading with the previous valid reading. '
                 'These are not approved operating limits or corrosion-risk categories.'
             )
-        st.markdown('**Data source**')
+
+        st.divider()
+        section_label('Data source')
         if excel_present:
-            st.caption('Default: Excel (history.xlsx). Demo Scenarios are optional and simulated.')
+            st.caption('Default: Excel (history.xlsx). Simulated scenarios require explicit activation.')
         else:
             st.error('history.xlsx was not found next to app.py. Excel mode is unavailable.')
         demo_mode = st.checkbox(
@@ -1229,7 +1437,8 @@ def render_dashboard():
     if refresh_now:
         load_history.clear()
 
-    st.title('CP Demo')
+    st.title('Cathodic Protection Monitoring Dashboard')
+    st.caption('Demonstration view of rectifier and solar output tags · not live SCADA monitoring')
     if demo_mode:
         event_note = (
             'Events stay in this browser session only and are not permanent.'
@@ -1274,7 +1483,7 @@ def render_dashboard():
         st.markdown(
             f'<div class="cp-source-box">'
             f'<strong>Data source:</strong> simulated demonstration scenario (not from history.xlsx)<br>'
-            f'<strong>Scenario build time (app clock):</strong> {loaded_at}<br>'
+            f'<strong>App clock / scenario build time:</strong> {loaded_at}<br>'
             f'<strong>Newest simulated measurement time:</strong> {format_timestamp(newest)}<br>'
             f'<strong>Latest simulated valid measurement:</strong> {format_timestamp(latest_valid)}'
             f'</div>',
@@ -1284,11 +1493,13 @@ def render_dashboard():
         st.markdown(
             f'<div class="cp-source-box">'
             f'<strong>Data source:</strong> history.xlsx historical SCADA tags (not live telemetry)<br>'
-            f'<strong>App load time (when this copy was read):</strong> {loaded_at}<br>'
+            f'<strong>App load time:</strong> {loaded_at} '
+            f'<span style="color:#486581">(when this workbook copy was read by the app)</span><br>'
             f'<strong>Newest workbook hour (historical):</strong> {format_timestamp(newest)}<br>'
             f'<strong>Latest available Excel measurement (historical):</strong> {format_timestamp(latest_valid)}<br>'
-            f'<strong>Note:</strong> Dates above are from the workbook contents. '
-            f'They are not a live field clock, and the app does not auto-sync Excel from SCADA.'
+            f'<strong>Note:</strong> Workbook dates are historical measurement times from Excel. '
+            f'They are separate from the app load time and are not a live field clock. '
+            f'The app does not auto-sync Excel from SCADA.'
             f'</div>',
             unsafe_allow_html=True,
         )
@@ -1303,13 +1514,13 @@ def render_dashboard():
         page_maintenance(summary, demo_mode)
     st.divider()
     if demo_mode and session_events:
-        st.caption('CP Demo · simulated scenario · session-only demonstration notes')
+        st.caption('CP Monitoring · simulated scenario · session-only demonstration notes')
     elif demo_mode:
-        st.caption('CP Demo · simulated scenario in memory only · workbook not modified')
+        st.caption('CP Monitoring · simulated scenario in memory only · workbook not modified')
     elif session_events:
-        st.caption('CP Demo · historical Excel workbook · session-only demonstration notes · not live monitoring')
+        st.caption('CP Monitoring · historical Excel workbook · session-only demonstration notes · not live monitoring')
     else:
-        st.caption('CP Demo · historical Excel workbook · read only · not live monitoring')
+        st.caption('CP Monitoring · historical Excel workbook · read only · not live monitoring')
 
 
 if __name__ == '__main__':

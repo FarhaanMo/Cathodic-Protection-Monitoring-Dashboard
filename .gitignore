@@ -28,9 +28,9 @@ credentials.json
 demo_events.json
 demo_scenario_events.json
 
-# Operational workbook — keep local only unless explicitly authorised
-history.xlsx
+# Excel workbooks — track approved history.xlsx only
 *.xlsx
+!history.xlsx
 
 # Backups, caches, logs
 app_backup*.py
