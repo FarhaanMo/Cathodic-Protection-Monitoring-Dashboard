@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Local Streamlit / IDE
+.streamlit/secrets.toml
+.idea/
+.vscode/
+*.swp
+
+# Secrets and credentials
+.env
+.env.*
+*.pem
+credentials.json
+*secret*
+*credentials*
+
+# Local operator / audit records (never deploy)
+demo_events.json
+demo_scenario_events.json
+
+# Operational workbook — keep local only unless explicitly authorised
+history.xlsx
+*.xlsx
+
+# Backups, caches, logs
+app_backup*.py
+*.bak
+*.log
+.cache/
+.pytest_cache/
+.mypy_cache/
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
