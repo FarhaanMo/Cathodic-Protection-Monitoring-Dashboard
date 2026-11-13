@@ -1,20 +1,29 @@
 # CP Demo
 
-Local and Streamlit Community Cloud demonstration of Spectrum’s cathodic-protection monitoring ideas.  
-This is a **demonstration**, not a live SCADA system and not a production audit trail.
+Cathodic-protection monitoring demonstration for Spectrum.  
+This is a **demonstration dashboard**, not live SCADA and not a production audit system.
 
 ## What it does
 
 - Four pages: **Overview**, **Historical Trends**, **Alerts**, **Maintenance**
-- Five in-memory **Demo Scenarios** (normal / warning / critical / data quality / sudden drop)
-- Illustrative threshold classification and operator inspection notes
-- Read-only Excel mode for offline local demos when `history.xlsx` is present
+- **Excel mode** (default when `history.xlsx` is present): historical SCADA tag readings from the workbook
+- **Simulated Demo Scenarios** (optional): in-memory examples that are clearly labelled as not Excel observations
+- Illustrative thresholds and operator inspection notes
 
 The app never writes to `history.xlsx`.
 
-## Local offline mode (Excel + optional scenarios)
+## Data source behaviour
 
-**Needs:** Python 3.11+ (e.g. Anaconda env `cpmonitor`), this folder, and `history.xlsx` next to `app.py`.
+| Condition | Behaviour |
+| --- | --- |
+| `history.xlsx` present, Demo Scenarios **off** (default) | Excel mode |
+| Demo Scenarios **on** | Simulated scenario data only (banner shown) |
+| `history.xlsx` missing, Demo Scenarios **off** | Clear error — Excel mode does not start |
+| `history.xlsx` missing, Demo Scenarios **on** | Simulated mode only |
+
+Streamlit Community Cloud does **not** force simulated mode. If the approved workbook is deployed with the app, Excel mode is the default there too.
+
+## Local launch
 
 ```bash
 conda activate cpmonitor
@@ -26,39 +35,37 @@ Open http://localhost:8501.
 
 | Setting | Behaviour |
 | --- | --- |
-| Demo Scenarios **off** (default) | Reads `history.xlsx` about every 5 seconds |
+| Demo Scenarios **off** | Reads local `history.xlsx` (saved-file changes rechecked about every 5 seconds) |
 | Demo Scenarios **on** | Synthetic readings in memory only |
-| Operator events (Excel mode) | `demo_events.json` |
-| Operator events (simulated mode) | `demo_scenario_events.json` |
-
-Those JSON files are local demo trails only. They are separate from each other and from the workbook.
+| Operator events (local Excel mode) | `demo_events.json` |
+| Operator events (local simulated mode) | `demo_scenario_events.json` |
 
 Presentation notes: `DEMO_GUIDE.md`  
-QA steps: `QA_CHECKLIST.md`
+QA steps: `QA_CHECKLIST.md`  
+Cloud deploy notes: `DEPLOYMENT_GUIDE.md`
 
-## Cloud demonstration mode (synthetic only)
+## Streamlit Community Cloud (Excel-backed)
 
-Public Streamlit Community Cloud deploys should **not** include `history.xlsx` or local event JSON files.
+When the approved `history.xlsx` is included in the GitHub repo used by Community Cloud:
 
-Cloud demo behaviour:
+- Default data source is the **deployed workbook copy** (historical, not live)
+- Demo Scenarios remain available and are labelled simulated
+- Operator notes use **session-only** storage on Cloud so visitors do not share records
 
-- Synthetic Demo Scenarios only (no Excel load)
-- Operator notes stored in the **visitor’s browser session only**
-- Clear on-screen labelling that records are temporary and not operational
-- Visitors do not share each other’s demonstration notes
-
-Force cloud behaviour even if a workbook is present:
+Optional environment / secret:
 
 ```text
-CP_DEMO_CLOUD=1
+CP_DEMO_SESSION_EVENTS=1
 ```
 
-If `CP_DEMO_CLOUD` is unset and `history.xlsx` is missing, the app also enters cloud demo mode automatically.
+Forces session-only event storage. On Community Cloud this is also detected automatically via the `/mount/src` app path.
 
-See `DEPLOYMENT_GUIDE.md` before uploading to GitHub or Streamlit Community Cloud.
+`history.xlsx` is still listed in `.gitignore` until you explicitly approve committing it. See `DEPLOYMENT_GUIDE.md`.
 
 ## Important limits
 
 - Voltage/current tags do **not** prove pipeline protection or anode life.
+- Workbook dates are historical measurement times from Excel, not a live field clock.
+- The app does **not** claim real-time monitoring or automatic SCADA→Excel synchronization.
 - Thresholds are illustrative demo assumptions, not approved operating limits.
 - Session or local JSON notes are **not** a production-grade audit system.

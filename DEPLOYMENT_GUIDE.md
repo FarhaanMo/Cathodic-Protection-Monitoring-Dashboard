@@ -1,8 +1,10 @@
 # Streamlit Community Cloud — deployment guide
 
-Do **not** deploy until the project owner confirms. This guide prepares a public **synthetic-only** demonstration.
+Do **not** deploy until the project owner confirms.
 
-## What to upload
+This app supports an **Excel-backed** Community Cloud deployment when the approved `history.xlsx` is included in the GitHub repository. Simulated Demo Scenarios remain optional and are never forced solely because the host is Streamlit Cloud.
+
+## What to upload (code)
 
 Include:
 
@@ -12,56 +14,75 @@ Include:
 - `README.md`
 - Optional docs: `DEMO_GUIDE.md`, `QA_CHECKLIST.md`, `DEPLOYMENT_GUIDE.md`
 
-Exclude (already listed in `.gitignore`):
+Still exclude unless separately approved:
 
-- `history.xlsx` (operational / historical workbook)
 - `demo_events.json`, `demo_scenario_events.json`
 - `app_backup*.py`, `__pycache__/`, local IDE folders
+- secrets / `.env`
+
+## Including the approved workbook (owner approval required)
+
+`.gitignore` currently excludes:
+
+```text
+history.xlsx
+*.xlsx
+```
+
+**Do not commit the workbook until the owner authorises it.** When authorised, the exact steps are:
+
+1. Confirm the file to publish is the approved `history.xlsx` (correct sheet `Trend History`, stations, and dates).
+2. Edit `.gitignore` and remove the lines that exclude `history.xlsx` / `*.xlsx` (or replace `*.xlsx` with a narrower rule that still ignores other Excel files).
+3. Stage and commit only that approved workbook:
+
+```bash
+git add -f history.xlsx
+git add .gitignore
+git commit -m "Add approved history.xlsx for Excel-backed Cloud demo"
+git push
+```
+
+4. Redeploy / reboot the Streamlit Community Cloud app so it receives the workbook.
+
+Until those steps are done, a Cloud app without the workbook will show a clear Excel-mode error unless the visitor enables Demo Scenarios.
 
 ## Recommended Streamlit Cloud settings
 
-1. Create a GitHub repository from the cleaned project (after owner approval).
-2. In [share.streamlit.io](https://share.streamlit.io), deploy from that repo.
-3. Main file: `app.py`
-4. Python version: 3.11 if offered.
-5. Under **Advanced settings → Secrets** or environment variables, set:
+1. Deploy from the GitHub repo after the approved workbook policy is decided.
+2. Main file: `app.py`
+3. Python version: 3.11 if offered.
+4. Optional secret / environment variable for session-only operator notes:
 
 ```toml
-CP_DEMO_CLOUD = "1"
+CP_DEMO_SESSION_EVENTS = "1"
 ```
 
-Or set environment variable `CP_DEMO_CLOUD=1`.
+On Community Cloud, session-only events are also auto-selected when the app path starts with `/mount/src`.
 
-Omitting `history.xlsx` alone also enables cloud demo mode. Setting `CP_DEMO_CLOUD=1` makes the intent explicit and prevents accidental Excel mode if a workbook is added later.
+Do **not** set a flag that forces simulated data. Excel mode is the default whenever `history.xlsx` is present.
 
 ## Runtime behaviour on Cloud
 
 | Topic | Behaviour |
 | --- | --- |
-| Data | Synthetic Demo Scenarios only |
-| Excel | Not loaded |
-| Operator events | Session-scoped per visitor; not shared; not durable |
-| Auto-refresh | Fragment still refreshes the simulated frame about every 5 seconds |
-| Persistent disk | Not relied on for audits or workbook state |
+| Excel present | Default source is the deployed `history.xlsx` copy |
+| Demo Scenarios | Optional; clearly labelled simulated |
+| Live SCADA | Not connected; workbook dates are historical |
+| Operator events | Session-scoped per visitor; labelled session-only |
+| Auto-refresh | Rechecks the deployed workbook file signature about every 5 seconds; does not pull new Excel from SCADA or from a local PC |
 
-## Local Excel mode after a cloud-oriented clone
-
-Keep `history.xlsx` only on trusted local machines. With the workbook present and `CP_DEMO_CLOUD` unset/off, local Excel mode continues to work as before.
+## Local Excel mode
 
 ```bash
-# Local Excel mode
-unset CP_DEMO_CLOUD   # or set CP_DEMO_CLOUD=0
 streamlit run app.py
 ```
 
+With `history.xlsx` next to `app.py`, Excel mode starts by default. Demo Scenarios stay optional.
+
 ## Security checklist before public upload
 
-- [ ] `history.xlsx` is **not** in the GitHub tree
+- [ ] Owner has authorised whether `history.xlsx` may be public on GitHub
+- [ ] If authorised: `.gitignore` updated and only the approved workbook committed
 - [ ] Local `demo_*.json` event files are **not** committed
 - [ ] Backup copies of `app.py` are **not** committed
-- [ ] `CP_DEMO_CLOUD=1` is configured for the Cloud app
-- [ ] README states that Cloud notes are temporary demonstration records
-
-## After deploy (owner only)
-
-Confirm the Cloud banner shows simulated/synthetic data, scenario switching works, and Maintenance events stay session-only with clear captions.
+- [ ] README states Cloud notes are temporary demonstration records when session storage is used

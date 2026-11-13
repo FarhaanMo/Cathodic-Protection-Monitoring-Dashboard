@@ -151,24 +151,34 @@ STATUS_FILL = {
 }
 
 
+SHEET_NAME = 'Trend History'
+
+
 def events_file_for(demo_mode: bool) -> Path:
     """Excel mode and simulated mode keep separate local event files."""
     return SCENARIO_EVENTS_FILE if demo_mode else EVENTS_FILE
 
 
-def is_cloud_demo() -> bool:
-    """True for Streamlit Community Cloud / synthetic-only deployments."""
-    flag = os.environ.get('CP_DEMO_CLOUD', '').strip().lower()
+def workbook_available() -> bool:
+    return WORKBOOK.is_file()
+
+
+def use_session_event_store() -> bool:
+    """
+    Use per-visitor session storage for operator notes on shared/ephemeral hosts.
+    This does not change the Excel vs Simulated data source.
+    """
+    flag = os.environ.get('CP_DEMO_SESSION_EVENTS', '').strip().lower()
     if flag in {'1', 'true', 'yes', 'on'}:
         return True
     if flag in {'0', 'false', 'no', 'off'}:
         return False
-    # Public deploys may omit history.xlsx on purpose.
-    return not WORKBOOK.is_file()
+    # Streamlit Community Cloud typically serves the app from /mount/src/...
+    return str(Path(__file__).resolve()).replace('\\', '/').startswith('/mount/src')
 
 
 def session_store_key(demo_mode: bool) -> str:
-    """Per-visitor session keys so cloud users do not share event records."""
+    """Per-visitor session keys so shared-host users do not share event records."""
     return 'cp_session_events_scenario' if demo_mode else 'cp_session_events_excel'
 
 
@@ -177,11 +187,47 @@ def workbook_signature(path: Path) -> tuple[int, int]:
     return (stat.st_mtime_ns, stat.st_size)
 
 
+def validate_workbook_structure(path: Path) -> None:
+    """Confirm the workbook matches the known Trend History layout before parsing."""
+    try:
+        sheets = pd.ExcelFile(path).sheet_names
+    except Exception as exc:
+        raise ValueError(f'Could not open workbook sheets ({type(exc).__name__}).') from exc
+    if SHEET_NAME not in sheets:
+        raise ValueError(
+            f'Worksheet "{SHEET_NAME}" was not found. Found: {", ".join(sheets) or "(none)"}.'
+        )
+    header = pd.read_excel(path, sheet_name=SHEET_NAME, header=None, nrows=3)
+    needed = max(ic for _, _, _, ic in STATIONS) + 1
+    if header.shape[1] < needed:
+        raise ValueError(
+            f'Worksheet "{SHEET_NAME}" has {header.shape[1]} columns; expected at least {needed}.'
+        )
+    for name, _kind, vc, _ic in STATIONS:
+        cell = header.iat[0, vc]
+        found = '' if pd.isna(cell) else str(cell).strip()
+        if found != name:
+            raise ValueError(
+                f'Station header mismatch at column {vc}: expected "{name}", found "{found or "(empty)"}".'
+            )
+
+
+def is_transient_workbook_error(exc: Exception) -> bool:
+    """True for temporary lock/save races where last-good local data may still help."""
+    if isinstance(exc, PermissionError):
+        return True
+    name = type(exc).__name__
+    text = str(exc).lower()
+    return name in {'BadZipFile', 'BadZipfile'} or 'excel file format' in text or 'not a zip' in text
+
+
 @st.cache_data(show_spinner='Reading history.xlsx...')
 def load_history(path_str: str, mtime_ns: int, size: int):
     # mtime_ns and size are arguments so either change misses the cache and rereads the file.
     del mtime_ns, size
-    raw = pd.read_excel(path_str, sheet_name='Trend History', header=None, skiprows=3)
+    path = Path(path_str)
+    validate_workbook_structure(path)
+    raw = pd.read_excel(path_str, sheet_name=SHEET_NAME, header=None, skiprows=3)
     raw['timestamp'] = pd.to_datetime(raw[0], errors='coerce') + pd.to_timedelta(raw[1].astype(str), errors='coerce')
     frames = []
     for name, kind, vc, ic in STATIONS:
@@ -199,13 +245,20 @@ def load_history(path_str: str, mtime_ns: int, size: int):
     return frame, loaded_at
 
 
-def load_with_fallback():
+def load_workbook_data():
+    """
+    Load history.xlsx.
+    Missing file or invalid structure: return the error with no substitute data.
+    Transient lock/save failures may reuse last-good data from this session with a warning.
+    """
+    if not WORKBOOK.is_file():
+        return None, None, FileNotFoundError(f'{WORKBOOK.name} was not found next to app.py.')
     try:
-        if not WORKBOOK.is_file():
-            raise FileNotFoundError(f'{WORKBOOK.name} was not found next to app.py.')
         mtime_ns, size = workbook_signature(WORKBOOK)
         frame, loaded_at = load_history(str(WORKBOOK), mtime_ns, size)
     except Exception as exc:
+        if not is_transient_workbook_error(exc):
+            return None, None, exc
         saved = st.session_state.get('cp_dataset')
         loaded_at = st.session_state.get('cp_loaded_at')
         if saved is None:
@@ -219,14 +272,16 @@ def load_with_fallback():
 def describe_read_error(exc: Exception) -> str:
     """Turn a file-read failure into a short message for the operator."""
     if isinstance(exc, FileNotFoundError):
-        return 'history.xlsx was not found next to app.py.'
+        return 'history.xlsx was not found next to app.py. Excel mode cannot start.'
+    if isinstance(exc, ValueError):
+        return f'history.xlsx structure is invalid: {exc}'
     if isinstance(exc, PermissionError):
         return 'history.xlsx is locked or still being saved.'
     name = type(exc).__name__
     text = str(exc).lower()
     if name in {'BadZipFile', 'BadZipfile'} or 'excel file format' in text or 'not a zip' in text:
         return 'history.xlsx could not be read. It may still be saving.'
-    return f'history.xlsx could not be read ({name}).'
+    return f'history.xlsx could not be read ({name}: {exc}).'
 
 
 def format_timestamp(value) -> str:
@@ -932,17 +987,17 @@ def event_choices(summary: pd.DataFrame) -> list[tuple[str, str]]:
 
 def page_events(summary: pd.DataFrame, demo_mode: bool):
     """Operator-created events. Recommendations above this section are generated and not saved."""
-    cloud = is_cloud_demo()
-    store_path = None if cloud else events_file_for(demo_mode)
-    session_key = session_store_key(demo_mode) if cloud else None
-    store_label = 'this browser session only' if cloud else store_path.name
+    session_events = use_session_event_store()
+    store_path = None if session_events else events_file_for(demo_mode)
+    session_key = session_store_key(demo_mode) if session_events else None
+    store_label = 'this browser session only' if session_events else store_path.name
     st.subheader('Operator inspection events')
     if st.session_state.get('event_message'):
         st.success(st.session_state.pop('event_message'))
-    if cloud:
+    if session_events:
         st.caption(
-            f'Demonstration notes for {store_label}. Not permanent and not operational records. '
-            'Other visitors cannot see these notes. history.xlsx is not used in cloud demo mode.'
+            f'Session-only demonstration notes ({store_label}). Not permanent and not operational records. '
+            'Other visitors cannot see these notes. They are cleared when the browser session ends.'
         )
     elif demo_mode:
         st.caption(
@@ -1028,7 +1083,7 @@ def page_events(summary: pd.DataFrame, demo_mode: bool):
                 st.warning(message)
 
     with st.expander('Audit history'):
-        if cloud:
+        if session_events:
             st.caption(
                 'Temporary demonstration audit trail for this browser session only. '
                 'It is not a production-grade immutable audit system and is cleared when the session ends.'
@@ -1108,11 +1163,10 @@ def page_maintenance(summary: pd.DataFrame, demo_mode: bool):
 
 @st.fragment(run_every='5s')
 def render_dashboard():
-    cloud = is_cloud_demo()
+    session_events = use_session_event_store()
+    excel_present = workbook_available()
     with st.sidebar:
         st.header('CP Demo')
-        if cloud:
-            st.caption('Cloud demonstration mode · simulated data only')
         refresh_now = st.button('Refresh Now', key='refresh_now', use_container_width=True)
         page = st.radio('Page', PAGES, key='page')
         st.markdown('**Thresholds**')
@@ -1150,32 +1204,40 @@ def render_dashboard():
                 'Sudden drop compares the latest reading with the previous valid reading. '
                 'These are not approved operating limits or corrosion-risk categories.'
             )
-        st.markdown('**Demo Scenarios**')
-        if cloud:
-            demo_mode = True
-            scenario = st.radio('Selected scenario', SCENARIO_NAMES, key='demo_scenario')
-            st.caption('Public cloud demo uses synthetic readings only. No Excel workbook is loaded.')
+        st.markdown('**Data source**')
+        if excel_present:
+            st.caption('Default: Excel (history.xlsx). Demo Scenarios are optional and simulated.')
         else:
-            demo_mode = st.checkbox('Enable Demo Scenarios', value=False, key='demo_mode')
-            scenario = None
-            if demo_mode:
-                scenario = st.radio('Selected scenario', SCENARIO_NAMES, key='demo_scenario')
-                st.caption('Simulated in memory only. Never written to history.xlsx.')
-            else:
-                st.caption('Excel mode: saved edits refresh about every 5 seconds.')
+            st.error('history.xlsx was not found next to app.py. Excel mode is unavailable.')
+        demo_mode = st.checkbox(
+            'Enable Demo Scenarios (simulated)',
+            value=False,
+            key='demo_mode',
+        )
+        scenario = None
+        if demo_mode:
+            scenario = st.radio('Selected scenario', SCENARIO_NAMES, key='demo_scenario')
+            st.caption('Simulated in memory only — not historical Excel observations. Never written to history.xlsx.')
+        elif excel_present:
+            st.caption(
+                'Excel mode: historical workbook readings only. Not live SCADA. '
+                'Local saved-file changes are rechecked about every 5 seconds; Cloud uses the deployed workbook copy.'
+            )
+        else:
+            st.caption('Turn on Demo Scenarios to continue without the workbook, or place history.xlsx next to app.py.')
 
-    if refresh_now and not cloud:
+    if refresh_now:
         load_history.clear()
 
     st.title('CP Demo')
     if demo_mode:
         event_note = (
             'Events stay in this browser session only and are not permanent.'
-            if cloud else
+            if session_events else
             'Events created here go to demo_scenario_events.json only.'
         )
         st.markdown(
-            f'<div class="cp-sim-banner">SIMULATED DATA — not from history.xlsx<br>'
+            f'<div class="cp-sim-banner">SIMULATED SCENARIO — not historical Excel observations<br>'
             f'Scenario: {scenario}<br>'
             f'{event_note}</div>',
             unsafe_allow_html=True,
@@ -1184,33 +1246,34 @@ def render_dashboard():
         loaded_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         read_error = None
     else:
-        df, loaded_at, read_error = load_with_fallback()
+        df, loaded_at, read_error = load_workbook_data()
 
     st.warning(
         'Voltage and current come from rectifier and solar tags. '
-        'They do not show whether the pipeline is protected, and they do not estimate anode life.'
+        'They do not show whether the pipeline is protected, and they do not estimate anode life. '
+        'This dashboard is not real-time monitoring.'
     )
 
     if not demo_mode and read_error is not None and df is None:
-        st.warning(f'{describe_read_error(read_error)} No earlier data is available.')
+        st.error(describe_read_error(read_error))
+        st.info(
+            'Enable Demo Scenarios (simulated) in the sidebar to continue with demonstration data, '
+            'or restore a valid history.xlsx next to app.py.'
+        )
         st.stop()
     if not demo_mode and read_error is not None:
         st.warning(
             f'{describe_read_error(read_error)} '
-            f'Showing the last successfully loaded data from {loaded_at}. '
+            f'Showing the last successfully loaded workbook data from this session ({loaded_at}). '
+            'This is temporary last-good data after a lock/save race — not a substitute workbook. '
             'The file will be tried again on the next refresh.'
         )
 
     newest, latest_valid = measurement_timestamps(df)
     if demo_mode:
-        source_line = (
-            'synthetic demonstration readings for Streamlit Community Cloud'
-            if cloud else
-            'simulated demonstration readings (not live)'
-        )
         st.markdown(
             f'<div class="cp-source-box">'
-            f'<strong>Data source:</strong> {source_line}<br>'
+            f'<strong>Data source:</strong> simulated demonstration scenario (not from history.xlsx)<br>'
             f'<strong>Scenario build time (app clock):</strong> {loaded_at}<br>'
             f'<strong>Newest simulated measurement time:</strong> {format_timestamp(newest)}<br>'
             f'<strong>Latest simulated valid measurement:</strong> {format_timestamp(latest_valid)}'
@@ -1221,9 +1284,11 @@ def render_dashboard():
         st.markdown(
             f'<div class="cp-source-box">'
             f'<strong>Data source:</strong> history.xlsx historical SCADA tags (not live telemetry)<br>'
-            f'<strong>App refresh / Excel load time:</strong> {loaded_at}<br>'
+            f'<strong>App load time (when this copy was read):</strong> {loaded_at}<br>'
             f'<strong>Newest workbook hour (historical):</strong> {format_timestamp(newest)}<br>'
-            f'<strong>Latest valid station measurement (historical):</strong> {format_timestamp(latest_valid)}'
+            f'<strong>Latest available Excel measurement (historical):</strong> {format_timestamp(latest_valid)}<br>'
+            f'<strong>Note:</strong> Dates above are from the workbook contents. '
+            f'They are not a live field clock, and the app does not auto-sync Excel from SCADA.'
             f'</div>',
             unsafe_allow_html=True,
         )
@@ -1237,12 +1302,14 @@ def render_dashboard():
     else:
         page_maintenance(summary, demo_mode)
     st.divider()
-    if cloud:
-        st.caption('CP Demo · public cloud demonstration · synthetic data · session-only notes')
+    if demo_mode and session_events:
+        st.caption('CP Demo · simulated scenario · session-only demonstration notes')
     elif demo_mode:
-        st.caption('CP Demo · simulated data in memory only · workbook not modified')
+        st.caption('CP Demo · simulated scenario in memory only · workbook not modified')
+    elif session_events:
+        st.caption('CP Demo · historical Excel workbook · session-only demonstration notes · not live monitoring')
     else:
-        st.caption('CP Demo · local offline demo · workbook is read only')
+        st.caption('CP Demo · historical Excel workbook · read only · not live monitoring')
 
 
 if __name__ == '__main__':
